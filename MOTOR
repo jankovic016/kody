@@ -1,0 +1,118 @@
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.std_logic_unsigned.all;    -- needed for +/- operations
+
+-- Input/output description
+entity top is
+    port (
+        BTN0: in std_logic;         -- sync. reset
+        SW0: in std_logic;          -- direction
+        CLK: in std_logic;
+        LED: out std_logic_vector(3 downto 0);
+        D_POS: out std_logic_vector(3 downto 0);
+        D_SEG: out std_logic_vector(6 downto 0)
+    );
+end top;
+
+-- Internal structure description
+architecture Behavioral of top is
+    -- internal signal definitions
+    signal clk_500: std_logic := '0';
+    signal tmp_500: std_logic_vector(11 downto 0) := x"000";    -- hexadecimal value
+    signal position: std_logic_vector(3 downto 0) := "0111";
+    signal oranzova: std_logic := '0';
+    -- FSM declaration
+    type my_states is (UP, RIGHT, DOWN, LEFT);
+    signal state: my_states;
+begin
+    -------------------
+    -- clock divider --
+    -------------------
+    -- increment auxiliary counter every rising edge of CLK
+    -- if you meet half a period of 500 ms invert clk_500
+    process (CLK)
+    begin
+        if rising_edge(CLK) then
+            tmp_500 <= tmp_500 + 1;
+            if tmp_500 = x"9c4" then
+                tmp_500 <= x"000";
+                clk_500 <= not clk_500;
+            end if;
+        end if;
+    end process;
+
+    --------------------------
+    -- Finite State Machine --
+    --------------------------
+    process (clk_500)
+    begin
+        if rising_edge(clk_500) then
+            -- sync. reset
+            if BTN0 = '0' then
+                state <= UP;
+            else
+                if SW0 = '0' then   --       DENNI REZIM
+                    if state = UP then
+                        state <= RIGHT;
+                    elsif state = RIGHT then
+                        state <= DOWN;
+                    elsif state = DOWN then 
+                        state <= LEFT;
+                    else 
+                        state <= UP;
+                     end if;
+             
+               else
+                 if state = UP then
+                        state <= LEFT;
+                    elsif state = LEFT then
+                        state <= DOWN;
+                    elsif state = DOWN then 
+                        state <= RIGHT;
+                    else 
+                        state <= UP;
+                     end if;
+                                                                  
+                end if;
+           end if;
+        end if;
+                
+        
+    end process;
+
+    ------------------------------------
+    -- state to seven-segment display --
+    ------------------------------------
+    --          0
+    -- 1       ---
+    -- 2    5 |   | 1
+    -- 3       ---   <- 6
+    -- 4    4 |   | 2
+    -- 5       ---
+    -- 6        3
+    process (state)
+    begin
+        if state = UP then
+            D_SEG <= "1111110";
+            elsif state = RIGHT then
+            D_SEG <= "1111101"; 
+                elsif state = DOWN then
+                D_SEG <= "0111111";  
+                    elsif state = LEFT then
+                    D_SEG <= "1011111"; 
+                       
+           
+                  
+              
+          
+        end if;
+        D_POS <= position;
+    end process;
+
+    ----------
+    -- LEDs --
+    ----------
+    LED(0) <= not BTN0;
+    LED(1) <= not SW0;
+end Behavioral;
+
